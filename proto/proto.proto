@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "hand-in-4/proto/proto";
+
+message Message {
+  int32 id = 1;
+  string msg = 2;
+  int32 lamport = 3;
+}
+
+message Empty {
+
+}
+
+service Service {
+  rpc SendMessage (Message) returns (Message);
+  rpc ConnectNode (Message) returns (Message);
+  rpc RemoveNode (Message) returns (Message);
+}

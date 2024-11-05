@@ -10,12 +10,16 @@ message Message {
   int32 lamport = 3;
 }
 
+message MessageResponse {
+  bool success = 1;    
+  string reply = 2;    
+}
+
 message Empty {
 
 }
 
 service Service {
-  rpc SendMessage (Message) returns (Message);
-  rpc ConnectNode (Message) returns (Message);
-  rpc RemoveNode (Message) returns (Message);
+  rpc SendMessage (Message) returns (MessageResponse);
+  rpc ConnectNode (Message) returns (MessageResponse);
 }

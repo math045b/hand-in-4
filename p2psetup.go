@@ -5,9 +5,8 @@ import (
 	"fmt"
 	pb "hand-in-4/proto"
 	"log"
+	"math/rand/v2"
 	"net"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -18,16 +17,15 @@ import (
 // protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/proto.proto
 type Node struct {
 	pb.UnimplementedServiceServer
-	ID           string
-	address      string
-	server       *grpc.Server
-	clients      map[string]pb.ServiceClient
-	mutex        sync.Mutex
-	timestamp    int64
-	requestQueue map[string]int64
+	ID            string
+	address       string
+	server        *grpc.Server
+	clients       map[string]pb.ServiceClient
+	mutex         sync.Mutex
+	timestamp     int64
+	usingResource bool
+	requestQueue  []pb.ServiceClient
 }
-
-var usingResource bool
 
 func NewNode(id, address string) *Node {
 	return &Node{
@@ -35,36 +33,41 @@ func NewNode(id, address string) *Node {
 		address:      address,
 		server:       grpc.NewServer(),
 		clients:      make(map[string]pb.ServiceClient),
-		requestQueue: make(map[string]int64),
+		requestQueue: make([]pb.ServiceClient, 0),
 	}
 }
 
-func main() {
-	myId := os.Args[2]
-	myPort := os.Args[3]
-	totalClients, _ := strconv.Atoi(os.Args[1])
+func (n *Node) loop() {
 
-	node := NewNode(myId, myPort)
-	usingResource = false
-	go node.StartServer()
-
-	if len(os.Args) > 4 {
-		joinPort := os.Args[4]
-		node.ConnectToNode(os.Args[2], joinPort)
+	chance := rand.IntN(3)
+	for {
+		time.Sleep(1 * time.Second)
+		//log.Printf("chance: %f", chance)
+		if !n.usingResource {
+			n.ProcessQueue()
+		}
+		if chance < 2 {
+			n.RequestResource()
+		}
+		chance = rand.IntN(3)
 	}
 }
 
 func (n *Node) RequestAccess(ctx context.Context, req *pb.AccessRequest) (*pb.AccessResponse, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
-
+	log.Printf("%s is requesting from %s", req.SenderId, n.ID)
 	n.timestamp = max(n.timestamp, req.Timestamp) + 1
 
-	if !usingResource && (len(n.requestQueue) == 0 || req.Timestamp < n.timestamp) {
+	if !n.usingResource && (len(n.requestQueue) == 0 || req.Timestamp < n.timestamp) {
 		return &pb.AccessResponse{Granted: true}, nil
 	}
-
-	n.requestQueue[req.SenderId] = req.Timestamp
+	requester := n.clients[req.SenderId]
+	if requester == nil {
+		log.Printf("No requester with id %s", req.SenderId)
+	}
+	log.Printf("Requester with id %s is being appended to %s", req.SenderId, n.ID)
+	n.requestQueue = append(n.requestQueue, requester)
 	return &pb.AccessResponse{Granted: false}, nil
 }
 
@@ -78,7 +81,6 @@ func (n *Node) RequestResource() {
 	n.timestamp++
 	timestamp := n.timestamp
 	n.mutex.Unlock()
-
 	for _, client := range n.clients {
 		req := &pb.AccessRequest{
 			SenderId:  n.ID,
@@ -100,20 +102,21 @@ func (n *Node) UseResource() {
 	time.Sleep(2 * time.Second)
 
 	n.mutex.Lock()
-	//n.usingResource = false
+	n.usingResource = true
 	n.mutex.Unlock()
 	n.ProcessQueue()
 	log.Printf("Node %s is finished with the resource", n.ID)
 }
 
 func (n *Node) ProcessQueue() {
-	for requester, _ := range n.requestQueue {
-		client, exists := n.clients[requester]
-		if exists {
-			req := &pb.GrantRequest{SenderId: n.ID}
-			client.GrantAccess(context.Background(), req)
-			delete(n.requestQueue, requester)
-		}
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	log.Printf("Node %s is processing its queue %d", n.ID, len(n.requestQueue))
+	for _, requester := range n.requestQueue {
+
+		req := &pb.GrantRequest{SenderId: n.ID}
+		requester.GrantAccess(context.Background(), req)
 	}
 }
 

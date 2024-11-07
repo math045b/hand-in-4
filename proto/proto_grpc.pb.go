@@ -19,16 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Service_SendMessage_FullMethodName = "/proto.Service/SendMessage"
-	Service_ConnectNode_FullMethodName = "/proto.Service/ConnectNode"
+	Service_RequestAccess_FullMethodName = "/proto.Service/RequestAccess"
+	Service_GrantAccess_FullMethodName   = "/proto.Service/GrantAccess"
 )
 
 // ServiceClient is the client API for Service service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServiceClient interface {
-	SendMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*MessageResponse, error)
-	ConnectNode(ctx context.Context, in *Message, opts ...grpc.CallOption) (*MessageResponse, error)
+	RequestAccess(ctx context.Context, in *AccessRequest, opts ...grpc.CallOption) (*AccessResponse, error)
+	GrantAccess(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error)
 }
 
 type serviceClient struct {
@@ -39,20 +39,20 @@ func NewServiceClient(cc grpc.ClientConnInterface) ServiceClient {
 	return &serviceClient{cc}
 }
 
-func (c *serviceClient) SendMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*MessageResponse, error) {
+func (c *serviceClient) RequestAccess(ctx context.Context, in *AccessRequest, opts ...grpc.CallOption) (*AccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MessageResponse)
-	err := c.cc.Invoke(ctx, Service_SendMessage_FullMethodName, in, out, cOpts...)
+	out := new(AccessResponse)
+	err := c.cc.Invoke(ctx, Service_RequestAccess_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serviceClient) ConnectNode(ctx context.Context, in *Message, opts ...grpc.CallOption) (*MessageResponse, error) {
+func (c *serviceClient) GrantAccess(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(MessageResponse)
-	err := c.cc.Invoke(ctx, Service_ConnectNode_FullMethodName, in, out, cOpts...)
+	out := new(GrantResponse)
+	err := c.cc.Invoke(ctx, Service_GrantAccess_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +63,8 @@ func (c *serviceClient) ConnectNode(ctx context.Context, in *Message, opts ...gr
 // All implementations must embed UnimplementedServiceServer
 // for forward compatibility.
 type ServiceServer interface {
-	SendMessage(context.Context, *Message) (*MessageResponse, error)
-	ConnectNode(context.Context, *Message) (*MessageResponse, error)
+	RequestAccess(context.Context, *AccessRequest) (*AccessResponse, error)
+	GrantAccess(context.Context, *GrantRequest) (*GrantResponse, error)
 	mustEmbedUnimplementedServiceServer()
 }
 
@@ -75,11 +75,11 @@ type ServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedServiceServer struct{}
 
-func (UnimplementedServiceServer) SendMessage(context.Context, *Message) (*MessageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
+func (UnimplementedServiceServer) RequestAccess(context.Context, *AccessRequest) (*AccessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestAccess not implemented")
 }
-func (UnimplementedServiceServer) ConnectNode(context.Context, *Message) (*MessageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ConnectNode not implemented")
+func (UnimplementedServiceServer) GrantAccess(context.Context, *GrantRequest) (*GrantResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GrantAccess not implemented")
 }
 func (UnimplementedServiceServer) mustEmbedUnimplementedServiceServer() {}
 func (UnimplementedServiceServer) testEmbeddedByValue()                 {}
@@ -102,38 +102,38 @@ func RegisterServiceServer(s grpc.ServiceRegistrar, srv ServiceServer) {
 	s.RegisterService(&Service_ServiceDesc, srv)
 }
 
-func _Service_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Message)
+func _Service_RequestAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AccessRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceServer).SendMessage(ctx, in)
+		return srv.(ServiceServer).RequestAccess(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Service_SendMessage_FullMethodName,
+		FullMethod: Service_RequestAccess_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).SendMessage(ctx, req.(*Message))
+		return srv.(ServiceServer).RequestAccess(ctx, req.(*AccessRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Service_ConnectNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Message)
+func _Service_GrantAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GrantRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceServer).ConnectNode(ctx, in)
+		return srv.(ServiceServer).GrantAccess(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Service_ConnectNode_FullMethodName,
+		FullMethod: Service_GrantAccess_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).ConnectNode(ctx, req.(*Message))
+		return srv.(ServiceServer).GrantAccess(ctx, req.(*GrantRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -146,12 +146,12 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SendMessage",
-			Handler:    _Service_SendMessage_Handler,
+			MethodName: "RequestAccess",
+			Handler:    _Service_RequestAccess_Handler,
 		},
 		{
-			MethodName: "ConnectNode",
-			Handler:    _Service_ConnectNode_Handler,
+			MethodName: "GrantAccess",
+			Handler:    _Service_GrantAccess_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

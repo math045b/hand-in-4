@@ -4,24 +4,17 @@ package proto;
 
 option go_package = "hand-in-4/proto/proto";
 
-message AccessRequest {
-  string sender_id = 1;    
-  int64 timestamp = 2;     
+
+message GrantTokenRequest {
+  string sender_id = 1;
+  int64 timestamp = 2;
 }
 
-message AccessResponse {
-  bool granted = 1;       
-}
-
-message GrantRequest {
-  string sender_id = 1;    
-}
-
-message GrantResponse {
-  bool success = 1;        
+message GrantTokenResponse {
+  bool success = 1;
+  int64 timestamp = 2;
 }
 
 service Service {
-  rpc RequestAccess (AccessRequest) returns (AccessResponse);
-  rpc GrantAccess (GrantRequest) returns (GrantResponse);
+  rpc GrantToken (GrantTokenRequest) returns (GrantTokenResponse);
 }

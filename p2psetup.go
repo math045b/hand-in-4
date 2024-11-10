@@ -5,7 +5,6 @@ import (
 	"fmt"
 	pb "hand-in-4/proto"
 	"log"
-	"math/rand/v2"
 	"net"
 	"sync"
 	"time"
@@ -17,14 +16,14 @@ import (
 // protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/proto.proto
 type Node struct {
 	pb.UnimplementedServiceServer
-	ID            string
-	address       string
-	server        *grpc.Server
-	clients       map[string]pb.ServiceClient
-	mutex         sync.Mutex
-	timestamp     int64
-	usingResource bool
-	requestQueue  []pb.ServiceClient
+	ID           string
+	address      string
+	server       *grpc.Server
+	client       pb.ServiceClient
+	mutex        sync.Mutex
+	timestamp    int64
+	hasToken     bool
+	requestQueue []pb.ServiceClient
 }
 
 func NewNode(id, address string) *Node {
@@ -32,92 +31,45 @@ func NewNode(id, address string) *Node {
 		ID:           id,
 		address:      address,
 		server:       grpc.NewServer(),
-		clients:      make(map[string]pb.ServiceClient),
 		requestQueue: make([]pb.ServiceClient, 0),
 	}
 }
 
-func (n *Node) loop() {
-
-	chance := rand.IntN(3)
+func (n *Node) loop(hasToken bool) {
+	n.hasToken = hasToken
 	for {
 		time.Sleep(1 * time.Second)
-		//log.Printf("chance: %f", chance)
-		if !n.usingResource {
-			n.ProcessQueue()
+		if n.hasToken {
+			n.UseResource()
+			n.hasToken = false
+
+			n.timestamp++
+			req := &pb.GrantTokenRequest{
+				SenderId:  n.ID,
+				Timestamp: n.timestamp,
+			}
+			response, err := n.client.GrantToken(context.Background(), req)
+			if err != nil || response.Success == false {
+				n.hasToken = true
+			}
+			n.timestamp = max(response.Timestamp, n.timestamp)
 		}
-		if chance < 2 {
-			n.RequestResource()
-		}
-		chance = rand.IntN(3)
 	}
 }
 
-func (n *Node) RequestAccess(ctx context.Context, req *pb.AccessRequest) (*pb.AccessResponse, error) {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	log.Printf("%s is requesting from %s", req.SenderId, n.ID)
-	n.timestamp = max(n.timestamp, req.Timestamp) + 1
-
-	if !n.usingResource && (len(n.requestQueue) == 0 || req.Timestamp < n.timestamp) {
-		return &pb.AccessResponse{Granted: true}, nil
-	}
-	requester := n.clients[req.SenderId]
-	if requester == nil {
-		log.Printf("No requester with id %s", req.SenderId)
-	}
-	log.Printf("Requester with id %s is being appended to %s", req.SenderId, n.ID)
-	n.requestQueue = append(n.requestQueue, requester)
-	return &pb.AccessResponse{Granted: false}, nil
-}
-
-func (n *Node) GrantAccess(ctx context.Context, req *pb.GrantRequest) (*pb.GrantResponse, error) {
-	log.Printf("Node %s received grant from %s\n", n.ID, req.SenderId)
-	return &pb.GrantResponse{Success: true}, nil
-}
-
-func (n *Node) RequestResource() {
-	n.mutex.Lock()
+func (n *Node) GrantToken(ctx context.Context, req *pb.GrantTokenRequest) (*pb.GrantTokenResponse, error) {
+	n.timestamp = max(req.Timestamp, n.timestamp)
 	n.timestamp++
-	timestamp := n.timestamp
-	n.mutex.Unlock()
-	for _, client := range n.clients {
-		req := &pb.AccessRequest{
-			SenderId:  n.ID,
-			Timestamp: timestamp,
-		}
-		response, err := client.RequestAccess(context.Background(), req)
-		log.Printf("Node %s recieved answer: %t\n", n.ID, response.Granted)
-		if err != nil || !response.Granted {
-			log.Printf("Node %s did not receive access from one or more nodes\n", n.ID)
-			return
-		}
-	}
-
-	n.UseResource()
+	log.Printf("(%d) Node %s received token from %s\n", n.timestamp, n.ID, req.SenderId)
+	n.hasToken = true
+	return &pb.GrantTokenResponse{Success: true, Timestamp: n.timestamp}, nil
 }
 
 func (n *Node) UseResource() {
-	log.Printf("Node %s is using the resource \n", n.ID)
+	log.Printf("(%d) Node %s is using the resource \n", n.timestamp, n.ID)
 	time.Sleep(2 * time.Second)
-
-	n.mutex.Lock()
-	n.usingResource = true
-	n.mutex.Unlock()
-	n.ProcessQueue()
-	log.Printf("Node %s is finished with the resource", n.ID)
-}
-
-func (n *Node) ProcessQueue() {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	log.Printf("Node %s is processing its queue %d", n.ID, len(n.requestQueue))
-	for _, requester := range n.requestQueue {
-
-		req := &pb.GrantRequest{SenderId: n.ID}
-		requester.GrantAccess(context.Background(), req)
-	}
+	n.timestamp++
+	log.Printf("(%d) Node %s is finished with the resource", n.timestamp, n.ID)
 }
 
 func (n *Node) ConnectToNode(nodeID, address string) error {
@@ -127,7 +79,7 @@ func (n *Node) ConnectToNode(nodeID, address string) error {
 	}
 
 	client := pb.NewServiceClient(conn)
-	n.clients[nodeID] = client
+	n.client = client
 	log.Printf("Node %s connected to node %s at %s\n", n.ID, nodeID, address)
 	return nil
 }
@@ -143,11 +95,5 @@ func (n *Node) StartServer() {
 	if err := n.server.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
-}
-
-func max(a int64, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
+	n.timestamp = 0
 }

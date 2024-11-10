@@ -99,13 +99,19 @@ func (n *Node) RequestResource() {
 
 func (n *Node) UseResource() {
 	log.Printf("Node %s is using the resource \n", n.ID)
-	time.Sleep(2 * time.Second)
 
 	n.mutex.Lock()
 	n.usingResource = true
 	n.mutex.Unlock()
-	n.ProcessQueue()
+	time.Sleep(2 * time.Second)
+
+	n.mutex.Lock()
+	n.usingResource = false
+	n.mutex.Unlock()
 	log.Printf("Node %s is finished with the resource", n.ID)
+
+	n.ProcessQueue()
+
 }
 
 func (n *Node) ProcessQueue() {

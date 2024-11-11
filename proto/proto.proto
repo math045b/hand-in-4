@@ -4,22 +4,17 @@ package proto;
 
 option go_package = "hand-in-4/proto/proto";
 
-message Message {
-  int32 id = 1;
-  string msg = 2;
-  int32 lamport = 3;
+
+message GrantTokenRequest {
+  string sender_id = 1;
+  int64 timestamp = 2;
 }
 
-message MessageResponse {
-  bool success = 1;    
-  string reply = 2;    
-}
-
-message Empty {
-
+message GrantTokenResponse {
+  bool success = 1;
+  int64 timestamp = 2;
 }
 
 service Service {
-  rpc SendMessage (Message) returns (MessageResponse);
-  rpc ConnectNode (Message) returns (MessageResponse);
+  rpc GrantToken (GrantTokenRequest) returns (GrantTokenResponse);
 }
